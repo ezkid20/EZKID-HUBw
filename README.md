@@ -1,2 +1,2 @@
 # EZKID-HUBw
-Free
+private
