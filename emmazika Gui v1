@@ -1,0 +1,449 @@
+-- coolkid_style_remaster.lua
+-- Autor: Sistema
+-- Descricao: Painel estilo CoolKid com funcoes F3X/HD admin, interface reorganizada e codigo otimizado
+
+-- Servicos
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Variaveis globais
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local GUI_NAME = "CoolKidHD"
+
+-- Destroi GUI antiga se existir
+if PlayerGui:FindFirstChild(GUI_NAME) then PlayerGui[GUI_NAME]:Destroy() end
+
+-- Cores (estilo CoolKid - azul/ciano escuro)
+local COLORS = {
+    BG = Color3.fromRGB(20, 25, 35),      -- fundo principal
+    CELL = Color3.fromRGB(30, 40, 55),    -- botoes/celulas
+    HEADER = Color3.fromRGB(10, 15, 25),  -- barra titulo
+    ACCENT = Color3.fromRGB(0, 150, 200), -- detalhes/bordas
+    TEXT = Color3.fromRGB(240, 248, 255)  -- texto branco gelo
+}
+
+-- ScreenGui principal
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = GUI_NAME
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999
+ScreenGui.Parent = PlayerGui
+
+-- Janela principal (arrastavel, redimensionavel minimo)
+local MainWindow = Instance.new("Frame", ScreenGui)
+MainWindow.Size = UDim2.new(0, 420, 0, 520)
+MainWindow.Position = UDim2.new(0.5, -210, 0.5, -260)
+MainWindow.BackgroundColor3 = COLORS.BG
+MainWindow.BorderSizePixel = 2
+MainWindow.BorderColor3 = COLORS.ACCENT
+MainWindow.ClipsDescendants = true
+
+-- Barra de titulo
+local TitleBar = Instance.new("Frame", MainWindow)
+TitleBar.Size = UDim2.new(1, 0, 0, 32)
+TitleBar.BackgroundColor3 = COLORS.HEADER
+TitleBar.BorderSizePixel = 1
+TitleBar.BorderColor3 = COLORS.ACCENT
+
+local TitleLabel = Instance.new("TextLabel", TitleBar)
+TitleLabel.Size = UDim2.new(1, -70, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "COOLKID HD ADMIN / F3X"
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 14
+TitleLabel.TextColor3 = COLORS.TEXT
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Botao fechar
+local CloseBtn = Instance.new("TextButton", TitleBar)
+CloseBtn.Size = UDim2.new(0, 24, 0, 20)
+CloseBtn.Position = UDim2.new(1, -28, 0, 6)
+CloseBtn.BackgroundColor3 = COLORS.CELL
+CloseBtn.BorderSizePixel = 1
+CloseBtn.BorderColor3 = COLORS.ACCENT
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = COLORS.TEXT
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 11
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+-- Botao minimizar
+local MinimizeBtn = Instance.new("TextButton", TitleBar)
+MinimizeBtn.Size = UDim2.new(0, 24, 0, 20)
+MinimizeBtn.Position = UDim2.new(1, -55, 0, 6)
+MinimizeBtn.BackgroundColor3 = COLORS.CELL
+MinimizeBtn.BorderSizePixel = 1
+MinimizeBtn.BorderColor3 = COLORS.ACCENT
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = COLORS.TEXT
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 14
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    MainWindow.Size = isMinimized and UDim2.new(0, 420, 0, 32) or UDim2.new(0, 420, 0, 520)
+end)
+
+-- Sistema de arrasto
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainWindow.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainWindow.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- Abas (apenas F3X/HD e Credits)
+local tabNames = {"F3X/HD ADMIN", "CREDITS"}
+local tabs = {}
+local TabBar = Instance.new("Frame", MainWindow)
+TabBar.Size = UDim2.new(1, 0, 0, 28)
+TabBar.Position = UDim2.new(0, 0, 0, 32)
+TabBar.BackgroundColor3 = COLORS.HEADER
+TabBar.BorderSizePixel = 1
+TabBar.BorderColor3 = COLORS.ACCENT
+
+local TabLayout = Instance.new("UIListLayout", TabBar)
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local ContentContainer = Instance.new("Frame", MainWindow)
+ContentContainer.Size = UDim2.new(1, 0, 1, -60)
+ContentContainer.Position = UDim2.new(0, 0, 0, 60)
+ContentContainer.BackgroundColor3 = COLORS.BG
+ContentContainer.BorderSizePixel = 0
+
+local function switchTab(tabId)
+    for idx, tab in pairs(tabs) do
+        tab.Container.Visible = (idx == tabId)
+        tab.Button.BackgroundColor3 = (idx == tabId) and COLORS.ACCENT or COLORS.CELL
+        tab.Button.BorderColor3 = (idx == tabId) and COLORS.TEXT or COLORS.ACCENT
+        tab.Button.TextColor3 = COLORS.TEXT
+    end
+end
+
+for i, name in ipairs(tabNames) do
+    local btn = Instance.new("TextButton", TabBar)
+    btn.Size = UDim2.new(0.5, 0, 1, 0)
+    btn.BackgroundColor3 = (i == 1) and COLORS.ACCENT or COLORS.CELL
+    btn.BorderSizePixel = 1
+    btn.BorderColor3 = (i == 1) and COLORS.TEXT or COLORS.ACCENT
+    btn.Text = name
+    btn.TextColor3 = COLORS.TEXT
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    btn.LayoutOrder = i
+
+    local container = Instance.new("Frame", ContentContainer)
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BackgroundColor3 = COLORS.BG
+    container.BorderSizePixel = 0
+    container.Visible = (i == 1)
+
+    tabs[i] = {Button = btn, Container = container}
+    local idx = i
+    btn.MouseButton1Click:Connect(function() switchTab(idx) end)
+end
+
+-- Funcao para criar scrolling grid
+local function createScrollingGrid(parent, cellWidthPercent, cellHeight)
+    local scroll = Instance.new("ScrollingFrame", parent)
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.BackgroundColor3 = COLORS.BG
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 4
+    scroll.ScrollBarImageColor3 = COLORS.ACCENT
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+    local grid = Instance.new("UIGridLayout", scroll)
+    grid.CellSize = UDim2.new(cellWidthPercent, -6, 0, cellHeight)
+    grid.CellPadding = UDim2.new(0, 4, 0, 6)
+    grid.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local padding = Instance.new("UIPadding", scroll)
+    padding.PaddingLeft = UDim.new(0, 6)
+    padding.PaddingTop = UDim.new(0, 6)
+
+    grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, grid.AbsoluteContentSize.Y + 12)
+    end)
+
+    return scroll, grid
+end
+
+-- Funcao para criar botao padrao
+local function createButton(parent, text, order, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.BackgroundColor3 = COLORS.CELL
+    btn.BorderSizePixel = 1
+    btn.BorderColor3 = COLORS.ACCENT
+    btn.Text = text
+    btn.TextColor3 = COLORS.TEXT
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 10
+    btn.TextWrapped = true
+    btn.LayoutOrder = order
+
+    btn.MouseButton1Click:Connect(function()
+        local originalBorder = btn.BorderColor3
+        btn.BorderColor3 = COLORS.TEXT
+        task.spawn(function()
+            local success = pcall(callback)
+            task.wait(0.15)
+            btn.BorderColor3 = success and Color3.fromRGB(0, 200, 0) or COLORS.TEXT
+            task.wait(1.0)
+            btn.BorderColor3 = originalBorder
+        end)
+    end)
+    return btn
+end
+
+-- ==================== F3X/HD ADMIN TAB ====================
+local f3xContainer = tabs[1].Container
+local f3xScroll, f3xGrid = createScrollingGrid(f3xContainer, 0.48, 38)
+
+-- Variaveis para remotes
+local HD_REMOTE = nil
+local F3X_REMOTE = nil
+local remoteScanned = false
+
+local function scanRemotes()
+    if remoteScanned then return end
+    remoteScanned = true
+
+    local hdNames = {"HDAdminRemote", "MainRemote", "HDAdmin", "AdminRemote", "Commands", "HD_Remote"}
+    local f3xNames = {"F3XRemote", "BuildRemote", "Remote", "BuildService"}
+
+    for _, name in ipairs(hdNames) do
+        local obj = ReplicatedStorage:FindFirstChild(name)
+        if obj and obj:IsA("RemoteEvent") then
+            HD_REMOTE = obj
+            break
+        end
+    end
+
+    for _, name in ipairs(f3xNames) do
+        local obj = ReplicatedStorage:FindFirstChild(name)
+        if obj and obj:IsA("RemoteEvent") then
+            F3X_REMOTE = obj
+            break
+        end
+    end
+
+    -- Notificacao de scan
+    local notif = Instance.new("Frame", ScreenGui)
+    notif.Size = UDim2.new(0, 320, 0, 40)
+    notif.Position = UDim2.new(0.5, -160, 1, 10)
+    notif.BackgroundColor3 = COLORS.HEADER
+    notif.BorderSizePixel = 2
+    notif.BorderColor3 = COLORS.ACCENT
+    local text = Instance.new("TextLabel", notif)
+    text.Size = UDim2.new(1, -8, 1, 0)
+    text.Position = UDim2.new(0, 4, 0, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = COLORS.TEXT
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 10
+    text.Text = string.format("[SCAN] HD: %s | F3X: %s",
+        HD_REMOTE and ("OK:" .. HD_REMOTE.Name) or "N/A",
+        F3X_REMOTE and ("OK:" .. F3X_REMOTE.Name) or "N/A"
+    )
+    TweenService:Create(notif, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -160, 1, -50)}):Play()
+    task.wait(4)
+    TweenService:Create(notif, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -160, 1, 10)}):Play()
+    task.wait(0.5)
+    notif:Destroy()
+end
+task.spawn(scanRemotes)
+
+local function hdCommand(cmd)
+    if not HD_REMOTE then scanRemotes() end
+    if HD_REMOTE then pcall(function() HD_REMOTE:FireServer(cmd) end) end
+end
+
+local function f3xFire(...)
+    if not F3X_REMOTE then scanRemotes() end
+    if F3X_REMOTE then pcall(function() F3X_REMOTE:FireServer(...) end) end
+end
+
+local function f3xSetProperty(obj, prop, value)
+    f3xFire("ChangeProp", obj, prop, value)
+    pcall(function()
+        if prop == "BrickColor" then obj.BrickColor = value
+        elseif prop == "Material" then obj.Material = value
+        elseif prop == "Anchored" then obj.Anchored = value
+        elseif prop == "Transparency" then obj.Transparency = value
+        end
+    end)
+end
+
+-- Botoes F3X/HD
+local btnOrder = 1
+createButton(f3xScroll, "DELETE ALL PARTS", btnOrder, function()
+    local char = LocalPlayer.Character
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not (char and part:IsDescendantOf(char)) then
+            f3xFire("Remove", part, nil, nil)
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "UNANCHOR ALL", btnOrder, function()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and part.Anchored then
+            f3xSetProperty(part, "Anchored", false)
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "ANCHOR ALL", btnOrder, function()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored then
+            f3xSetProperty(part, "Anchored", true)
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "NEON ALL", btnOrder, function()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            f3xSetProperty(part, "Material", Enum.Material.Neon)
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "RED COLOR ALL", btnOrder, function()
+    local redBrick = BrickColor.new("Bright red")
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            f3xSetProperty(part, "BrickColor", redBrick)
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "FREEZE ALL PLAYERS", btnOrder, function()
+    hdCommand(":freeze all")
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "CRASH ALL PLAYERS", btnOrder, function()
+    hdCommand(":crash all")
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "KICK FIRST PLAYER", btnOrder, function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            hdCommand(":kick " .. plr.Name .. " [COOLKID]")
+            break
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "BAN FIRST PLAYER", btnOrder, function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            hdCommand(":ban " .. plr.Name .. " [COOLKID]")
+            break
+        end
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "LAG SERVER (200 parts)", btnOrder, function()
+    for i = 1, 200 do
+        local p = Instance.new("Part", workspace)
+        p.Size = Vector3.new(1, 1, 1)
+        p.Anchored = false
+        p.CanCollide = false
+        p.Position = Vector3.new(math.random(-200, 200), math.random(50, 150), math.random(-200, 200))
+        p.Material = Enum.Material.Neon
+        p.BrickColor = BrickColor.random()
+        Debris:AddItem(p, 12)
+    end
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "ALERT ALL PLAYERS", btnOrder, function()
+    hdCommand(":alert all COOLKID HD/F3X ATIVADO")
+end)
+btnOrder = btnOrder + 1
+
+createButton(f3xScroll, "NOTIFY ALL PLAYERS", btnOrder, function()
+    hdCommand(":notify all COOLKID REMASTER")
+end)
+btnOrder = btnOrder + 1
+
+-- ==================== CREDITS TAB ====================
+local creditsContainer = tabs[2].Container
+local creditsScroll = Instance.new("ScrollingFrame", creditsContainer)
+creditsScroll.Size = UDim2.new(1, 0, 1, 0)
+creditsScroll.BackgroundColor3 = COLORS.BG
+creditsScroll.BorderSizePixel = 0
+creditsScroll.ScrollBarThickness = 4
+creditsScroll.CanvasSize = UDim2.new(0, 0, 0, 320)
+
+local function addCreditLine(yPos, text, size, isBold)
+    local line = Instance.new("TextLabel", creditsScroll)
+    line.Size = UDim2.new(1, -12, 0, size + 12)
+    line.Position = UDim2.new(0, 6, 0, yPos)
+    line.BackgroundColor3 = COLORS.CELL
+    line.BorderSizePixel = 1
+    line.BorderColor3 = COLORS.ACCENT
+    line.Text = text
+    line.Font = isBold and Enum.Font.GothamBold or Enum.Font.Gotham
+    line.TextSize = size
+    line.TextColor3 = COLORS.TEXT
+    line.TextXAlignment = Enum.TextXAlignment.Center
+    line.TextWrapped = true
+end
+
+addCreditLine(0, "COOLKID HD/F3X REMASTER", 16, true)
+addCreditLine(28, "by: ezkidxz / remaster: system", 12, false)
+addCreditLine(52, "estilo inspirado no CoolKid", 11, false)
+addCreditLine(76, "FUNCOES:", 13, true)
+addCreditLine(100, "• Delete ALL", 11, false)
+addCreditLine(122, "• Anchor/Unanchor ALL", 11, false)
+addCreditLine(144, "• Neon / Red ALL", 11, false)
+addCreditLine(166, "• Freeze / Crash / Kick / Ban", 11, false)
+addCreditLine(188, "• Lag Server", 11, false)
+addCreditLine(210, "• Alert / Notify global", 11, false)
+addCreditLine(240, "github.com/ezkid20", 11, false)
+addCreditLine(268, "discord.gg/ezkidxz", 11, false)
+
+-- Inicia na primeira aba
+switchTab(1)
+print("[COOLKID HD/F3X] GUI carregada com sucesso!")
+```
